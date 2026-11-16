@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>日本の衛星写真ビューワー（Cesium）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フライト航跡ビューワー（Cesium）</title>
 <script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
 <link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
 <style>
@@ -12,15 +13,71 @@
     margin: 0; padding: 0; overflow: hidden;
     font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
   }
+  #panel {
+    position: absolute;
+    top: 10px; left: 10px;
+    background: rgba(20, 20, 20, 0.75);
+    color: #fff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 999;
+    line-height: 1.6;
+    max-width: 300px;
+  }
+  #panel h1 { font-size: 15px; margin: 0 0 8px 0; }
+  #flightSelect {
+    width: 100%;
+    padding: 6px;
+    font-size: 14px;
+    border-radius: 4px;
+  }
+  #info { margin-top: 8px; font-size: 12px; color: #9fd; white-space: pre-line; }
+  #error { margin-top: 8px; font-size: 12px; color: #f88; display: none; }
+  #legend { margin-top: 8px; font-size: 11px; color: #ccc; }
+  #legendBar {
+    height: 8px; border-radius: 4px; margin-top: 2px;
+    background: linear-gradient(to right, hsl(216,100%,50%), hsl(108,100%,50%), hsl(0,100%,50%));
+  }
+  #legendLabels { display: flex; justify-content: space-between; }
 </style>
 </head>
 <body>
 <div id="cesiumContainer"></div>
+<div id="panel">
+  <h1>フライト航跡ビューワー</h1>
+  <select id="flightSelect"></select>
+  <div id="info">便を選択してください</div>
+  <div id="error"></div>
+  <div id="legend">
+    高度
+    <div id="legendBar"></div>
+    <div id="legendLabels"><span>低</span><span>高</span></div>
+  </div>
+</div>
 
 <script>
-// Cesium Ion のトークンは不要（国土地理院の航空写真タイルのみ使用）
+// ============================================================
+// 搭乗した便の登録（ここに追記していくと、プルダウンに選択肢が増えます）
+//   date   : 搭乗日 (YYYY-MM-DD)
+//   flight : 便名（Flightradar24 の Callsign 等）
+//   route  : 路線の表示名
+//   file   : CSVファイルのパス（このHTMLからの相対パス）
+// ============================================================
+const FLIGHTS = [
+  { date: '2022-10-23', flight: 'JL3515', route: '福岡 → 新千歳', file: 'data/20221023_JL3515.csv' },
+  { date: '2022-10-28', flight: 'JL3510', route: '新千歳 → 福岡', file: 'data/20221028_JL3510.csv' },
+  { date: '2023-09-05', flight: 'BC503', route: '福岡 → 那覇', file: 'data/20230905_BC503.csv' },
+  { date: '2023-09-08', flight: 'SKY508', route: '那覇 → 福岡', file: 'data/20230905_BC508.csv' },
+  // { date: '2026-01-10', flight: 'JAL316', route: '羽田 → 福岡', file: 'data/20260110_JAL316.csv' },
+];
 
-// ホームボタンや初期表示で日本全体が見えるようにする
+const FT_TO_M = 0.3048;
+const MAX_ALT_FOR_COLOR_M = 12000; // この高度で最も赤くなる
+
+// ============================================================
+// Viewer（国土地理院の航空写真）
+// ============================================================
 Cesium.Camera.DEFAULT_VIEW_RECTANGLE = Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0);
 Cesium.Camera.DEFAULT_VIEW_FACTOR = 0.1;
 
@@ -33,7 +90,6 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
   animation: false,
   timeline: false,
   fullscreenButton: true,
-  // 国土地理院「全国最新写真（シームレス）」を航空写真の背景として使用
   baseLayer: new Cesium.ImageryLayer(
     new Cesium.UrlTemplateImageryProvider({
       url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
@@ -43,20 +99,221 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
     })
   )
 });
-
 viewer.scene.globe.enableLighting = false;
-
-// 地球のベースカラー（タイル読み込み前の背景色）
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#a9c9e8');
-
-// 初期表示：日本全体
-viewer.camera.setView({
-  destination: Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0)
-});
-
-// エンティティ選択時の吹き出し（InfoBox）は使わない
+viewer.camera.setView({ destination: Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0) });
 viewer.infoBox.container.style.display = 'none';
 viewer.selectionIndicator.container.style.display = 'none';
+
+// ============================================================
+// プルダウンの構築
+// ============================================================
+const selectEl = document.getElementById('flightSelect');
+const infoEl = document.getElementById('info');
+const errorEl = document.getElementById('error');
+
+(function buildSelect() {
+  const ph = document.createElement('option');
+  ph.value = '';
+  ph.textContent = '日付・路線（便名）を選択';
+  selectEl.appendChild(ph);
+
+  // 新しい日付が上に来るように並べ替え
+  [...FLIGHTS]
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .forEach((f) => {
+      const opt = document.createElement('option');
+      opt.value = f.file;
+      opt.textContent = `${f.date}　${f.route}（${f.flight}）`;
+      selectEl.appendChild(opt);
+    });
+})();
+
+// ============================================================
+// CSV 読み込み
+// ============================================================
+
+// ダブルクォート対応の1行分割（Position列は "lat,lon" と引用されている）
+function splitCsvLine(line) {
+  const out = [];
+  let cur = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (c === ',' && !inQuote) {
+      out.push(cur); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseFlightCsv(text) {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim() !== '');
+  if (lines.length < 2) return [];
+  const header = splitCsvLine(lines[0]).map((h) => h.trim());
+  const idx = {
+    ts: header.indexOf('Timestamp'),
+    pos: header.indexOf('Position'),
+    alt: header.indexOf('Altitude'),
+    spd: header.indexOf('Speed')
+  };
+  const points = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = splitCsvLine(lines[i]);
+    const [lat, lon] = (cols[idx.pos] || '').split(',').map(Number);
+    const altFt = Number(cols[idx.alt]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(altFt)) continue;
+    points.push({
+      ts: Number(cols[idx.ts]),
+      lat, lon,
+      altM: Math.max(altFt, 0) * FT_TO_M,
+      speedKt: Number(cols[idx.spd])
+    });
+  }
+  return points;
+}
+
+// ============================================================
+// 航跡の描画
+// ============================================================
+let trackPrimitive = null;
+const trackDataSource = new Cesium.CustomDataSource('track');
+viewer.dataSources.add(trackDataSource);
+
+function clearTrack() {
+  if (trackPrimitive) {
+    viewer.scene.primitives.remove(trackPrimitive);
+    trackPrimitive = null;
+  }
+  trackDataSource.entities.removeAll();
+}
+
+function altitudeColor(altM) {
+  const t = Math.min(Math.max(altM / MAX_ALT_FOR_COLOR_M, 0), 1);
+  // 青(低) → 緑 → 赤(高)
+  return Cesium.Color.fromHsl(0.6 * (1 - t), 1.0, 0.5, 1.0);
+}
+
+function drawTrack(points) {
+  clearTrack();
+
+  const positions = points.map((p) => Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.altM));
+  const colors = points.map((p) => altitudeColor(p.altM));
+
+  // 高度で色分けした航跡ライン
+  trackPrimitive = viewer.scene.primitives.add(new Cesium.Primitive({
+    geometryInstances: new Cesium.GeometryInstance({
+      geometry: new Cesium.PolylineGeometry({
+        positions,
+        colors,
+        colorsPerVertex: true,
+        width: 4.0,
+        arcType: Cesium.ArcType.NONE,
+        vertexFormat: Cesium.PolylineColorAppearance.VERTEX_FORMAT
+      })
+    }),
+    appearance: new Cesium.PolylineColorAppearance({ translucent: false }),
+    asynchronous: false
+  }));
+
+  // 地面までの半透明の壁（高度が分かりやすくなる）
+  trackDataSource.entities.add({
+    wall: {
+      positions: Cesium.Cartesian3.fromDegreesArray(points.flatMap((p) => [p.lon, p.lat])),
+      maximumHeights: points.map((p) => p.altM),
+      minimumHeights: points.map(() => 0),
+      material: Cesium.Color.WHITE.withAlpha(0.15),
+      outline: false
+    }
+  });
+
+  // 始点・終点マーカー
+  const first = points[0];
+  const last = points[points.length - 1];
+  [['Start', first, Cesium.Color.LIME], ['End', last, Cesium.Color.ORANGE]].forEach(([text, p, color]) => {
+    trackDataSource.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(p.lon, p.lat, p.altM),
+      point: { pixelSize: 10, color, outlineColor: Cesium.Color.BLACK, outlineWidth: 2,
+               disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: {
+        text,
+        font: '14px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -14),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+  });
+
+  // 航跡全体が見えるようにカメラを移動
+  const sphere = Cesium.BoundingSphere.fromPoints(positions);
+  viewer.camera.flyToBoundingSphere(sphere, {
+    duration: 2.0,
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), sphere.radius * 2.8)
+  });
+}
+
+function formatDuration(sec) {
+  if (!Number.isFinite(sec) || sec < 0) return '-';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}時間${m}分` : `${m}分`;
+}
+
+// ============================================================
+// 選択時の処理
+// ============================================================
+let loadToken = 0; // 連続で選択した場合に古い読み込み結果を無視するため
+
+selectEl.addEventListener('change', async () => {
+  const file = selectEl.value;
+  errorEl.style.display = 'none';
+  const token = ++loadToken;
+
+  if (!file) {
+    clearTrack();
+    infoEl.textContent = '便を選択してください';
+    return;
+  }
+
+  infoEl.textContent = '読み込み中...';
+  try {
+    const res = await fetch(file);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (token !== loadToken) return;
+
+    const points = parseFlightCsv(text);
+    if (points.length < 2) throw new Error('有効なデータ行がありません');
+
+    drawTrack(points);
+
+    const maxAltM = Math.max(...points.map((p) => p.altM));
+    const maxSpeed = Math.max(...points.map((p) => p.speedKt || 0));
+    infoEl.textContent =
+      `データ点数: ${points.length}\n` +
+      `飛行時間: ${formatDuration(points[points.length - 1].ts - points[0].ts)}\n` +
+      `最高高度: ${Math.round(maxAltM).toLocaleString()} m（${Math.round(maxAltM / FT_TO_M).toLocaleString()} ft）\n` +
+      `最高速度: ${maxSpeed} kt`;
+  } catch (err) {
+    if (token !== loadToken) return;
+    console.error(err);
+    clearTrack();
+    infoEl.textContent = '';
+    errorEl.textContent = `CSVの読み込みに失敗しました（${file}）: ${err.message}`;
+    errorEl.style.display = 'block';
+  }
+});
 </script>
 </body>
 </html>
