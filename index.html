@@ -132,9 +132,9 @@ const errorEl = document.getElementById('error');
   ph.textContent = '日付・路線（便名）を選択';
   selectEl.appendChild(ph);
 
-  // 新しい日付が上に来るように並べ替え
+  // 古い日付が上に来るように並べ替え
   [...FLIGHTS]
-    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
     .forEach((f) => {
       const opt = document.createElement('option');
       opt.value = f.file;
