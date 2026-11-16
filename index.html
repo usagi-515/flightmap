@@ -135,6 +135,11 @@ viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#a9c9e8');
 viewer.camera.setView({ destination: Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0) });
 viewer.infoBox.container.style.display = 'none';
 viewer.selectionIndicator.container.style.display = 'none';
+viewer.scene.setTerrain(
+  new Cesium.Terrain(
+    Cesium.CesiumTerrainProvider.fromUrl('https://tile.plateauview.mlit.go.jp/terrain/')
+  )
+);
 
 // ============================================================
 // プルダウンの構築
