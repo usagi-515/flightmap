@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>日本の衛星写真ビューワー（Cesium）</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style>
+  html, body, #cesiumContainer {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    margin: 0; padding: 0; overflow: hidden;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  }
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+
+<script>
+// Cesium Ion のトークンは不要（国土地理院の航空写真タイルのみ使用）
+
+// ホームボタンや初期表示で日本全体が見えるようにする
+Cesium.Camera.DEFAULT_VIEW_RECTANGLE = Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0);
+Cesium.Camera.DEFAULT_VIEW_FACTOR = 0.1;
+
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  baseLayerPicker: false,
+  geocoder: false,
+  homeButton: true,
+  sceneModePicker: true,
+  navigationHelpButton: false,
+  animation: false,
+  timeline: false,
+  fullscreenButton: true,
+  // 国土地理院「全国最新写真（シームレス）」を航空写真の背景として使用
+  baseLayer: new Cesium.ImageryLayer(
+    new Cesium.UrlTemplateImageryProvider({
+      url: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
+      credit: '国土地理院（全国最新写真（シームレス））',
+      minimumLevel: 2,
+      maximumLevel: 18
+    })
+  )
+});
+
+viewer.scene.globe.enableLighting = false;
+
+// 地球のベースカラー（タイル読み込み前の背景色）
+viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#a9c9e8');
+
+// 初期表示：日本全体
+viewer.camera.setView({
+  destination: Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0)
+});
+
+// エンティティ選択時の吹き出し（InfoBox）は使わない
+viewer.infoBox.container.style.display = 'none';
+viewer.selectionIndicator.container.style.display = 'none';
+</script>
+</body>
+</html>
