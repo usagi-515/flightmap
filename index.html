@@ -37,7 +37,8 @@
   #legend { margin-top: 8px; font-size: 11px; color: #ccc; }
   #legendBar {
     height: 8px; border-radius: 4px; margin-top: 2px;
-    background: linear-gradient(to right, hsl(216,100%,50%), hsl(108,100%,50%), hsl(0,100%,50%));
+    background: linear-gradient(to right,
+      hsl(216,100%,50%), hsl(162,100%,50%), hsl(108,100%,50%), hsl(54,100%,50%), hsl(0,100%,50%));
   }
   #legendLabels { display: flex; justify-content: space-between; }
 </style>
@@ -50,10 +51,11 @@
   <div id="info">便を選択してください</div>
   <div id="error"></div>
   <div id="legend">
-    高度
+    高度（ft）
     <div id="legendBar"></div>
-    <div id="legendLabels"><span>低</span><span>高</span></div>
-  </div>
+    <div id="legendLabels">
+      <span>0</span><span>10,000</span><span>20,000</span><span>30,000</span><span>40,000</span>
+    </div>
 </div>
 
 <script>
@@ -104,7 +106,7 @@ const FLIGHTS = [
 ];
 
 const FT_TO_M = 0.3048;
-const MAX_ALT_FOR_COLOR_M = 12000; // この高度で最も赤くなる
+const MAX_ALT_FOR_COLOR_M = 36000 * FT_TO_M; // この高度で最も赤くなる
 
 // ============================================================
 // Viewer（国土地理院の航空写真）
