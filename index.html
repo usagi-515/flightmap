@@ -48,6 +48,11 @@
 <div id="panel">
   <h1>フライト航跡ビューワー</h1>
   <select id="flightSelect"></select>
+  
+  <label style="display:block;margin-top:8px;">
+    <input type="checkbox" id="toggleBuildings"> 3D建物を表示
+  </label>
+  
   <div id="info">便を選択してください</div>
   <div id="error"></div>
   <div id="legend">
@@ -155,6 +160,11 @@ const viewer = new Cesium.Viewer('cesiumContainer', {
 });
 viewer.scene.globe.enableLighting = false;
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#a9c9e8');
+viewer.scene.setTerrain(
+  new Cesium.Terrain(
+    Cesium.CesiumTerrainProvider.fromUrl('https://tile.plateauview.mlit.go.jp/terrain/')
+  )
+);  
 viewer.camera.setView({ destination: Cesium.Rectangle.fromDegrees(122.0, 24.0, 146.0, 46.0) });
 viewer.infoBox.container.style.display = 'none';
 viewer.selectionIndicator.container.style.display = 'none';
@@ -372,6 +382,29 @@ selectEl.addEventListener('change', async () => {
     errorEl.textContent = `CSVの読み込みに失敗しました（${file}）: ${err.message}`;
     errorEl.style.display = 'block';
   }
+});
+const BUILDING_AREAS = [
+  { name: '福岡市', code: '40130' },
+];
+
+let buildingTilesets = [];
+
+async function loadBuildings() {
+  for (const area of BUILDING_AREAS) {
+    const url = `https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/${area.code}-bldg-lod2-latest/tileset.json`;
+    try {
+      const ts = await Cesium.Cesium3DTileset.fromUrl(url, { maximumScreenSpaceError: 16 });
+      viewer.scene.primitives.add(ts);
+      buildingTilesets.push(ts);
+    } catch (e) {
+      console.error(`${area.name}の建物の読み込みに失敗`, e);
+    }
+  }
+}
+
+document.getElementById('toggleBuildings').addEventListener('change', async (e) => {
+  if (e.target.checked && buildingTilesets.length === 0) await loadBuildings();
+  buildingTilesets.forEach((ts) => (ts.show = e.target.checked));
 });
 </script>
 </body>
