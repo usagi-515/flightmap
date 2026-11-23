@@ -383,17 +383,18 @@ selectEl.addEventListener('change', async () => {
     errorEl.style.display = 'block';
   }
 });
+
 const BUILDING_AREAS = [
-  { name: '福岡市', code: '40130' },
+  { name: '福岡市', url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/40130-bldg-lod2-latest/tileset.json' },
+  { name: '大田区', url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/13111-bldg-lod2-latest/tileset.json' },
 ];
 
 let buildingTilesets = [];
 
 async function loadBuildings() {
   for (const area of BUILDING_AREAS) {
-    const url = `https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/${area.code}-bldg-lod2-latest/tileset.json`;
     try {
-      const ts = await Cesium.Cesium3DTileset.fromUrl(url, { maximumScreenSpaceError: 16 });
+      const ts = await Cesium.Cesium3DTileset.fromUrl(area.url, { maximumScreenSpaceError: 16 });
       viewer.scene.primitives.add(ts);
       buildingTilesets.push(ts);
     } catch (e) {
