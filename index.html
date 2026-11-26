@@ -385,8 +385,59 @@ selectEl.addEventListener('change', async () => {
 });
 
 const BUILDING_AREAS = [
-  { name: '福岡市', url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/40130-bldg-lod2-latest/tileset.json' },
-  { name: '大田区', url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/13111-bldg-lod2-latest/tileset.json' },
+  // 北海道
+  {
+    name: '札幌市',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/01100-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '千歳市（新千歳空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/01224-bldg-lod2-latest/tileset.json'
+  },
+
+  // 関東
+  {
+    name: '成田市（成田空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/12211-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '大田区（羽田空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/13111-bldg-lod2-latest/tileset.json'
+  },
+
+  // 中部
+  {
+    name: '常滑市（中部国際空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/23216-bldg-lod2-latest/tileset.json'
+  },
+
+  // 近畿
+  {
+    name: '泉佐野市（関西国際空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/27213-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '伊丹市（大阪国際空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/27203-bldg-lod2-latest/tileset.json'
+  },
+
+  // 九州
+  {
+    name: '福岡市（福岡空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/40130-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '宮崎市（宮崎空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/45201-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '鹿児島市（鹿児島空港周辺地域）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/46201-bldg-lod2-latest/tileset.json'
+  },
+  {
+    name: '那覇市（那覇空港）',
+    url: 'https://api.plateauview.mlit.go.jp/datacatalog/3dtiles/47201-bldg-lod2-latest/tileset.json'
+  }
 ];
 
 let buildingTilesets = [];
